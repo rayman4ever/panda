@@ -332,11 +332,7 @@ void safety_rx_hook(CAN_FIFOMailBox_TypeDef *to_push);
 int safety_tx_hook(CAN_FIFOMailBox_TypeDef *to_send, int hardwired);
 int safety_tx_lin_hook(int lin_num, uint8_t *data, int len, int hardwired);
 
-#ifdef PANDA_SAFETY
-#include "panda_safety.h"
-#else
-#include "honda_safety.h"
-#endif
+#include "gm_safety.h"
 
 // ***************************** CAN *****************************
 
@@ -657,7 +653,7 @@ int usb_cb_control_msg(USB_Setup_TypeDef *setup, uint8_t *resp, int hardwired) {
       }
       break;
     case 0xdb: // toggle GMLAN
-      set_can2_mode(setup->b.wValue.w);
+      set_can1_mode(setup->b.wValue.w);
       break;
     case 0xdc: // set controls allowed
       controls_allowed = setup->b.wValue.w == 0x1337;
