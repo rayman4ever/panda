@@ -147,6 +147,55 @@ void set_can2_mode(int use_gmlan) {
   while((CAN2->MSR & CAN_MSR_INAK) == CAN_MSR_INAK);
 }
 
+// Prerequisites to use single-wire GMLAN:
+// - PB8 & PB9 (CAN1) are wired to a RX & TX of single-wire
+//   GMLAN transceiver NCV7356 circuitry:
+//   https://www.onsemi.com/pub/Collateral/NCV7356-D.PDF
+// - Mode0 and mode1 pins of the transceiver are pulled up.
+void set_can1_mode(int use_gmlan) {
+
+  // http://www.bittiming.can-wiki.info/#bxCAN
+  // 24 MHz, sample point at 87.5%
+  uint32_t pclk = 24000;
+  uint32_t num_time_quanta = 16;
+  uint32_t prescaler;
+
+  if (use_gmlan) {
+    // 33.3 kbps
+    prescaler = pclk / num_time_quanta * 10 / 333;
+
+    // pull up RX
+    GPIOB->PUPDR |= GPIO_PUPDR_PUPDR8_0;
+  } else {
+    // 500 kbps
+    prescaler = pclk / num_time_quanta / 500;
+
+    GPIOB->PUPDR &= ~GPIO_PUPDR_PUPDR8_0;
+  }
+
+  CAN_TypeDef *CAN = CAN1;
+
+  // init
+  CAN->MCR = CAN_MCR_TTCM | CAN_MCR_INRQ;
+  while((CAN->MSR & CAN_MSR_INAK) != CAN_MSR_INAK);
+
+  // set speed
+  // seg 1: 13 time quanta, seg 2: 2 time quanta
+  CAN->BTR = (CAN_BTR_TS1_0 * 12) |
+    CAN_BTR_TS2_0 | (prescaler - 1);
+
+  // running
+  CAN->MCR = CAN_MCR_TTCM;
+
+  // unlike Panda's approach of switching transceivers,
+  // current setup is for CAN1 to be hardwired to a single
+  // transceiver, therefore setting a wrong mode will never succeed
+  int tick = 0;
+  #define CAN_TIMEOUT 1000000
+  while((CAN->MSR & CAN_MSR_INAK) == CAN_MSR_INAK &&
+    tick++ < CAN_TIMEOUT);
+}
+
 // board specific
 void gpio_init() {
   // pull low to hold ESP in reset??
