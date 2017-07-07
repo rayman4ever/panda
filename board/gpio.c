@@ -79,6 +79,7 @@ void set_can_mode(int canid, int use_gmlan) {
      1        1        33kbit (normal)
   */
 
+  #ifdef PANDA
   // connects to CAN2 xcvr or GMLAN xcvr
   if (use_gmlan) {
     if (canid == 1) {
@@ -131,6 +132,19 @@ void set_can_mode(int canid, int use_gmlan) {
 
   set_gpio_output(GPIOB, 14, use_gmlan);
   set_gpio_output(GPIOB, 15, use_gmlan);
+
+  #else // PANDA
+
+  // Volt board, GMLAN on PB8 & PB9
+  if (use_gmlan) {
+    can_ports[canid].bitrate = GMLAN_DEFAULT_BITRATE;
+  } else {
+    can_ports[canid].bitrate = CAN_DEFAULT_BITRATE;
+  }
+  if (canid == 1) {
+    set_gpio_pullup(GPIOB, 8, use_gmlan ? PULL_UP : 0);
+  }
+  #endif
 
   can_init(canid);
 }
@@ -191,6 +205,8 @@ void gpio_init() {
   set_gpio_alternate(GPIOB, 8, GPIO_AF8_CAN1);
   set_gpio_alternate(GPIOB, 9, GPIO_AF8_CAN1);
 #else
+  set_gpio_mode(GPIOB, 5, MODE_ALTERNATE);
+  set_gpio_mode(GPIOB, 6, MODE_ALTERNATE);
   set_gpio_alternate(GPIOB, 8, GPIO_AF9_CAN1);
   set_gpio_alternate(GPIOB, 9, GPIO_AF9_CAN1);
 #endif

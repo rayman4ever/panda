@@ -41,14 +41,14 @@
      .gmlan_support=false,
      .gmlan=false,
      .safety_mode=0,
-     .pin={GPIOB, 3, 1}},
+     .pin={GPIOB, 4, 1}},
     {.CAN=CAN1,
      .forwarding=-1,
      .bitrate=CAN_DEFAULT_BITRATE,
-     .gmlan_support=false,
+     .gmlan_support=true,
      .gmlan=false,
      .safety_mode=0,
-     .pin={GPIOB, 4, 1}},
+     .pin={GPIOB, 3, 1}},
   };
 #endif
 

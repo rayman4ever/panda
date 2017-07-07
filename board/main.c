@@ -172,11 +172,7 @@ void safety_rx_hook(CAN_FIFOMailBox_TypeDef *to_push);
 int safety_tx_hook(CAN_FIFOMailBox_TypeDef *to_send, int hardwired);
 int safety_tx_lin_hook(int lin_num, uint8_t *data, int len, int hardwired);
 
-#ifdef PANDA_SAFETY
-#include "panda_safety.h"
-#else
-#include "honda_safety.h"
-#endif
+#include "gm_safety.h"
 
 #define PANDA_CANB_RETURN_FLAG 0x80
 
@@ -255,13 +251,30 @@ void can_rx(CAN_TypeDef *CAN, int can_index) {
 
     // forwarding (panda only)
     #ifdef PANDA
-      if (can_ports[can_index].forwarding != -1) {
+      uint32_t addr;
+      if (to_push.RIR & 4) {
+        // Extended
+        addr = to_push.RIR >> 3;
+      } else {
+        // Normal
+        addr = to_push.RIR >> 21;
+      }
+
+      int dst_can_idx = -1;
+      if (can_index == 1 && (addr == 0x180 || addr == 0x409 || addr == 0x2cb || addr == 0x370)) {
+        dst_can_idx = 0;
+      } else if (can_index == 1 && addr == 0x315) {
+        dst_can_idx = 2;
+     } else if (can_index == 0 && (addr == 388 || addr == 485 || addr == 840 || addr == 842 || addr == 241 || addr == 189 || addr == 190 || addr == 309)) {
+        dst_can_idx = 1;
+      }
+      if (dst_can_idx != -1) {
         CAN_FIFOMailBox_TypeDef to_send;
         to_send.RIR = to_push.RIR | 1; // TXRQ
         to_send.RDTR = to_push.RDTR;
         to_send.RDLR = to_push.RDLR;
         to_send.RDHR = to_push.RDHR;
-        send_can(&to_send, can_ports[can_index].forwarding);
+        send_can(&to_send, dst_can_idx);
       }
     #endif
 
@@ -283,13 +296,21 @@ void can_rx(CAN_TypeDef *CAN, int can_index) {
 void CAN1_RX0_IRQHandler() {
   //puts("CANRX1");
   //delay(10000);
+  #ifdef PANDA
   can_rx(CAN1, 0);
+  #else
+  can_rx(CAN1, 1);
+  #endif
 }
 
 void CAN2_RX0_IRQHandler() {
   //puts("CANRX0");
   //delay(10000);
+  #ifdef PANDA
   can_rx(CAN2, 1);
+  #else
+  can_rx(CAN2, 0);
+  #endif
 }
 
 #ifdef CAN3
@@ -529,17 +550,17 @@ int usb_cb_control_msg(USB_Setup_TypeDef *setup, uint8_t *resp, int hardwired) {
 
       can_port_desc *port = &can_ports[canid];
 
-      //Fail if canid doesn't support gmlan
+      // Fail if canid doesn't support gmlan
       if (!port->gmlan_support)
         return -1;
 
-      //ACK the USB pipe but don't do anything; nothing to do.
+      // ACK the USB pipe but don't do anything; nothing to do.
       if (port->gmlan == gmlan_enable) {
         puts("The CAN bus is already in the requested gmlan config.\n");
         break;
       }
 
-      // Check to see if anyther canid is acting as gmlan, disable it.
+      // Check to see if another canid is acting as gmlan, disable it.
       if (gmlan_enable) {
         for (i = 0; i < CAN_MAX; i++) {
           if (can_ports[i].gmlan) {
@@ -784,12 +805,7 @@ int main() {
   // enable USB
   usb_init();
 
-  // default to silent mode to prevent issues with Ford
-#ifdef PANDA_SAFETY
-  controls_allowed = 0;
-#else
   controls_allowed = 1;
-#endif
 
   can_init(0);
   can_init(1);
@@ -860,6 +876,11 @@ int main() {
   __enable_irq();
 
   puts("OPTCR: "); puth(FLASH->OPTCR); puts("\n");
+
+#ifdef PANDA
+  // ESP off
+  GPIOC->ODR &= ~(1 << 14);
+#endif
 
   // LED should keep on blinking all the time
   uint64_t cnt;
