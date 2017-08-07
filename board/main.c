@@ -895,6 +895,9 @@ int main() {
   // set PWM
   set_fan_speed(65535);
 
+  // Volt: enable the object detection bus and the radar
+  set_gpio_mode(GPIOB, 12, MODE_OUTPUT);
+  set_gpio_output(GPIOB, 12, 1);
 
   puts("**** INTERRUPTS ON ****\n");
   __disable_irq();
